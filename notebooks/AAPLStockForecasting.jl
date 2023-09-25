@@ -27,7 +27,7 @@ println(first(df, 1))
 println(last(df, 1))
 
 # describing DataFrame
-describe(df)
+println(describe(df))
 
 # inspecting DataFrame shape
 df_shape = nrow(df), ncol(df)
@@ -131,12 +131,14 @@ model = getmodel(in_size, hidden_size, out_size)
 # defining loss function
 loss(x, y) = mse(model(x), y)
 
+
 # ===================
 # Model training
 # ===================
 η = Float32(.001)
 opt = Adam(η)
 
+# define training step function
 function traninsetp(opt, model, Xtrain, ytrain; EPOCHS=100)
     opt_state = Flux.setup(opt, model)
     # option 3
@@ -151,6 +153,7 @@ function traninsetp(opt, model, Xtrain, ytrain; EPOCHS=100)
 
 end
 
+# train the model
 traninsetp(opt, model, Xtrain, ytrain; EPOCHS=100)
 
 # Results visualization
@@ -158,6 +161,7 @@ pred = model(xtest[end])
 loss(xtest[end], ytest[end])
 plot(2800:length(ytest), ytest[2800:end])
 scatter!([length(ytest)], [pred], ms=3.)
+
 
 # ===================
 # Stationary Approach
