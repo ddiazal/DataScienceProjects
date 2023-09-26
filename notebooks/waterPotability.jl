@@ -1,10 +1,10 @@
-# import libraries
+# Import libraries
 using CSV, DataFrames
 
-# import some 
+# Import some 
 using Statistics: mean, std
 
-# import oversample function for imbalance data
+# Import oversample function for imbalance data
 using MLUtils: oversample
 
 # Import Plots, and StatsPlots for visualizations and diagnostics.
@@ -13,24 +13,28 @@ using StatsPlots
 
 # =============================
 PATH = "/Users/danieldiazalmeida/Downloads/DataScienceDatasets/water_potability/"
-# train data file
+# Train data file
 data = "water_train.csv" 
 
-# read data with CSV and transform it to DataFrame
+# Read data with CSV and transform it to DataFrame
 df = DataFrame(CSV.File(PATH * data))
 print(first(df))
 println(last(df, 1))
 
-# inspecting DataFrame shape
+# Inspecting DataFrame shape
 df_shape = nrow(df), ncol(df)
 println("The DataFrame shape is $df_shape")
 
-# describe data
+# Describe data
 println(describe(df))
 
-# dataset presents zero missing values for all features and target.
-# 
-colsname(df)
-(df)
-# separate target from predictors
-target = df[!, :]
+# Dataset presents zero missing values for all features and target.
+# In addition, all predictors range between 0 and 1.
+
+# Lowercase DataFrame column names
+rename!(df, strip.(lowercase.(names(df))))
+println(names(df))
+
+# Separate target from predictors
+target = df[!, :potability]
+predictors = select(df, Not(:potability))
