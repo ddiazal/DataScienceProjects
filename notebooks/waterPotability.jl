@@ -38,3 +38,12 @@ println(names(df))
 # Separate target from predictors
 target = df[!, :potability]
 predictors = select(df, Not(:potability))
+
+
+# =================================
+# Exploring Predictors Data
+# =================================
+
+# Plot predictor distribution (histogram)
+plot([histogram(predictors[!, col]; label=col) for col in names(predictors)]...)
+savefig("waterPotabilityPredictorsHistogram.png") 
