@@ -28,4 +28,9 @@ println("The DataFrame shape is $df_shape")
 # describe data
 println(describe(df))
 
-# dataset presents zero missing values for all features and target
+# dataset presents zero missing values for all features and target.
+# 
+colsname(df)
+(df)
+# separate target from predictors
+target = df[!, :]
