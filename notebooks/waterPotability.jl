@@ -2,7 +2,7 @@
 using CSV, DataFrames
 
 # Import some 
-using Statistics: mean, std
+using Statistics: mean, std, cor
 
 # Import oversample function for imbalance data
 using MLUtils: oversample
@@ -43,7 +43,16 @@ predictors = select(df, Not(:potability))
 # =================================
 # Exploring Predictors Data
 # =================================
+cols = names(predictors)
 
 # Plot predictor distribution (histogram)
-plot([histogram(predictors[!, col]; label=col) for col in names(predictors)]...)
+plot([histogram(predictors[!, col]; label=col) for col in cols]...)
 savefig("waterPotabilityPredictorsHistogram.png") 
+
+plot([boxplot(predictors[!, col]; label=col) for col in cols]...)
+savefig("waterPotabilityPredictorsBoxplot.png") 
+
+# correlation
+@df predictors corrplot(cols(1:4), grid = false)
+
+corr = [cor(target, predictors[!, col]) for col in cols]
