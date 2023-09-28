@@ -5,7 +5,7 @@ using CSV, DataFrames
 using Statistics: mean, std, cor
 
 # Import oversample function for imbalance data
-using MLUtils: oversample
+using MLUtils: oversample, splitobs, getobs, numobs
 
 # Import Plots, and StatsPlots for visualizations and diagnostics.
 using Plots: plot, plot!, scatter!
@@ -66,3 +66,39 @@ heatmap(cor(predictors|> Matrix),
     # rotate x ticks
     xrot=90
 )
+
+
+# =================================
+# Data Preprocessing
+# =================================
+using FeatureTransforms: StandardScaling, fit!, apply!
+# determine number of positive and negative samples
+npos = sum(target .== 1)
+nneg = sum(target .== 0)
+
+# sample observations percentage
+pos_obs = npos / df_shape[1]
+neg_obs = nneg / df_shape[1]
+
+# positive sample weight
+pos_weight = nneg / npos
+println("The weight of postive observations is $pos_weight")
+
+# split data into training and testing sets
+train, test = splitobs((predictors |> values, target), at=0.8, shuffle=true)
+trainobs, testobs = numobs(train), numobs(test)
+
+Xtrain, Ytrain = getobs(train, 1:trainobs)
+xtest, ytest = getobs(test, 1:testobs)
+
+getobs(train, 1:1206) #|> values
+numobs(train)
+
+scaler = StandardScaling()
+fit!(scaler, Xtrain)
+apply!(Xtrain, scaler)
+apply!(xtest, scaler)
+
+#norm_predictors = mapcols(x -> (x .- mean(x))./std(x), predictors)
+
+
