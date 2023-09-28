@@ -86,18 +86,73 @@ println("The weight of postive observations is $pos_weight")
 
 # split data into training and testing sets
 train, test = splitobs((predictors |> values, target), at=0.8, shuffle=true)
+# get the number of observations in each dataset
 trainobs, testobs = numobs(train), numobs(test)
 
-# retreive xtrain, ytrain, xtest and ytest
+# retreive xtrain, ytrain sets 
 Xtrain, Ytrain = getobs(train, 1:trainobs)
+# retreive xtest and ytest sets 
 xtest, ytest = getobs(test, 1:testobs)
 
 # standardize train and test sets
 scaler = StandardScaling()
+# fit scaler onto train data
 fit!(scaler, Xtrain)
+# apply fitted scaler to standardize train predictors
 apply!(Xtrain, scaler)
+# apply fitted scaler to standardize test predictors
 apply!(xtest, scaler)
 
 #norm_predictors = mapcols(x -> (x .- mean(x))./std(x), predictors)
 
+Xtrain = Xtrain |> permutedims |> Matrix
+Ytrain = reshape(Ytrain, (1, trainobs))
+xtest = xtest |> permutedims |> Matrix
+ytest = reshape(ytest, (1, testobs))
 
+# =================================
+# Modeling
+# =================================
+using Flux, ProgressMeter
+using Flux.Data: DataLoader
+using Flux.Losses: logitbinarycrossentropy
+
+# data
+mapcols!(x->Float32.(x), Xtrain)
+Ytrain = Int32.(Ytrain)
+mapcols!(x->Float32.(x), xtest)
+ytest = Int32.(ytest)
+
+trainloader = DataLoader((Xtrain, Ytrain), batchsize=32, shuffle=true)
+testloader = DataLoader((xtest, ytest), batchsize=32, shuffle=false)
+
+in_features = length(cols)
+# define model
+model = Chain(
+    Dense(in_features => 32, NNlib.elu),
+    Dense(32 => 32,  NNlib.elu),
+    Dense(32 => 1, identity)
+)
+
+# define loss function with positive class weight
+loss(ŷ, y) = logitbinarycrossentropy(ŷ, y, agg=x->mean(pos_weight .* x))
+
+# optimizer
+η = Float32(.001)
+opt = Adam(η)
+function train_step(model, trainloader, EPOCHS)
+    opt_state = Flux.setup(opt, model)
+    for i=1:EPOCHS
+        for d in trainloader
+            xbatch, ybatch = d
+            grads = Flux.gradient(model) do m
+                ŷ = m(xbatch)
+                loss(ŷ, ybatch)
+            end
+        Flux.update!(opt_state, model, grads[1])
+        end
+    end
+
+end
+
+train_step(model, trainloader, 1)
