@@ -88,12 +88,11 @@ println("The weight of postive observations is $pos_weight")
 train, test = splitobs((predictors |> values, target), at=0.8, shuffle=true)
 trainobs, testobs = numobs(train), numobs(test)
 
+# retreive xtrain, ytrain, xtest and ytest
 Xtrain, Ytrain = getobs(train, 1:trainobs)
 xtest, ytest = getobs(test, 1:testobs)
 
-getobs(train, 1:1206) #|> values
-numobs(train)
-
+# standardize train and test sets
 scaler = StandardScaling()
 fit!(scaler, Xtrain)
 apply!(Xtrain, scaler)
