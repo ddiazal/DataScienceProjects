@@ -53,6 +53,16 @@ plot([boxplot(predictors[!, col]; label=col) for col in cols]...)
 savefig("waterPotabilityPredictorsBoxplot.png") 
 
 # correlation
-@df predictors corrplot(cols(1:4), grid = false)
+@df predictors corrplot(cols(1:9), grid = false; size=(900,600))
 
 corr = [cor(target, predictors[!, col]) for col in cols]
+
+# heatmap plot for predictors correlation matrix
+heatmap(cor(predictors|> Matrix),
+    xticks=(1:9, cols),
+    yticks=(1:9, cols);
+    # plot size
+    size=(900,600),
+    # rotate x ticks
+    xrot=90
+)
