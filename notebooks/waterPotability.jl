@@ -191,6 +191,19 @@ for epoch = 1:20
     model_acc(model, testloader)
 end
 
+
+# ==========================
+# Training with FluxTraining
+# ==========================
+using FluxTraining
+
+lossfn = Flux.Losses.logitbinarycrossentropy
+optimizer = Flux.ADAM()
+learner = Learner(model, lossfn; callbacks=[ToGPU(), Metrics(accuracy)], optimizer)
+
+FluxTraining.fit!(learner, 10, (trainloader, testloader))
+
+
 # ----------------------
 # Training with GPU
 using Metal
@@ -249,10 +262,4 @@ for epoch = 1:epochs
 end
 
 
-using FluxTraining
 
-lossfn = Flux.Losses.logitbinarycrossentropy
-optimizer = Flux.ADAM();
-learner = Learner(model, lossfn; callbacks=[ToGPU(), Metrics(accuracy)], optimizer)
-
-FluxTraining.fit!(learner, 10, (trainloader, testloader))
