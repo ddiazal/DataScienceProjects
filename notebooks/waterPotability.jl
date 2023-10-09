@@ -105,10 +105,11 @@ apply!(xtest, scaler)
 
 #norm_predictors = mapcols(x -> (x .- mean(x))./std(x), predictors)
 
-Xtrain = Xtrain |> permutedims |> Matrix
-Ytrain = reshape(Ytrain, (1, trainobs))
-xtest = xtest |> permutedims |> Matrix
-ytest = reshape(ytest, (1, testobs))
+mapcols!(x->Float32.(x), Xtrain)
+Ytrain = Int32.(Ytrain)
+mapcols!(x->Float32.(x), xtest)
+ytest = Int32.(ytest)
+
 
 # =================================
 # Modeling
@@ -118,10 +119,10 @@ using Flux.Data: DataLoader
 using Flux.Losses: logitbinarycrossentropy
 
 # data
-mapcols!(x->Float32.(x), Xtrain)
-Ytrain = Int32.(Ytrain)
-mapcols!(x->Float32.(x), xtest)
-ytest = Int32.(ytest)
+Xtrain = Xtrain |> permutedims |> Matrix
+Ytrain = reshape(Ytrain, (1, trainobs))
+xtest = xtest |> permutedims |> Matrix
+ytest = reshape(ytest, (1, testobs))
 
 trainloader = DataLoader((Xtrain, Ytrain), batchsize=32, shuffle=true)
 testloader = DataLoader((xtest, ytest), batchsize=32, shuffle=false)
@@ -135,24 +136,123 @@ model = Chain(
 )
 
 # define loss function with positive class weight
+pos_weight = Float32(pos_weight)
 loss(ŷ, y) = logitbinarycrossentropy(ŷ, y, agg=x->mean(pos_weight .* x))
 
 # optimizer
 η = Float32(.001)
 opt = Adam(η)
+
+
+function model_acc(model, testloader)
+    acc = []
+    Flux.testmode!(model)
+    for (xbatch, ybatch) in testloader
+        output = model(xbatch)
+        ŷ = output .≥ .5
+        pred = sum(ŷ .== ybatch) / length(ybatch)
+        push!(acc, pred) 
+    end
+    println("model avg accuracy: $(mean(acc))")
+end
+
+
 function train_step(model, trainloader, EPOCHS)
+    # train loss vector
+    trainloss_vec = []
+
     opt_state = Flux.setup(opt, model)
+    Flux.trainmode!(model)
     for i=1:EPOCHS
-        for d in trainloader
-            xbatch, ybatch = d
+        trainloss = 0
+        for (xbatch, ybatch) in trainloader
             grads = Flux.gradient(model) do m
                 ŷ = m(xbatch)
-                loss(ŷ, ybatch)
+                trainloss += loss(ŷ, ybatch)
             end
-        Flux.update!(opt_state, model, grads[1])
+            Flux.update!(opt_state, model, grads[1])
         end
+
+        if i%2 == 0
+            push!(trainloss_vec, trainloss/length(trainloader))
+        end
+
     end
+    println("The avg training loss is $(mean(trainloss_vec))")
+    println("Done!")
 
 end
 
-train_step(model, trainloader, 1)
+
+train_step(model, trainloader, 2_000)
+model_acc(model, testloader)
+for epoch = 1:20
+    train_step(model, trainloader)
+    model_acc(model, testloader)
+end
+
+# ----------------------
+# Training with GPU
+using Metal
+Metal.versioninfo()
+
+Metal.functional()
+device = Flux.get_device(; verbose=true)
+
+model_gpu = device(model) 
+
+# Extract weights and a helper function to reconstruct NN from weights
+parameters_initial, reconstruct = Flux.destructure(model_gpu)
+
+ps = Flux.params(model_gpu) |> device
+opt_state = Flux.setup(opt, model_gpu) |> device
+for i=1:1
+    for d in trainloader
+        x, y = device(d)
+        grads = Flux.gradient(ps) do 
+            loss(model_gpu(x), y)
+        end
+        Flux.Optimise.update!(opt, ps, grads)
+    end
+end
+
+
+x, y = first(trainloader)
+x = device(x)
+y = device(y)
+
+model_gpu(x)
+loss(model_gpu(x), y)
+
+
+opt= Adam(0.001f0)
+opt_state = Flux.setup(opt, model_gpu)
+for i=1:1
+    for d in trainloader
+        x, y = device(d)
+        Flux.train!(loss, ps, [(x, y)], opt)
+        #Flux.train!(loss, model_gpu, [(x, y)], opt_state)
+        #Flux.train!((m,x,y) -> loss(x, y), model_gpu, [(x, y)], opt_state)
+    end
+end
+
+epochs = 10
+
+for epoch = 1:epochs
+  for d in trainloader
+    gs = gradient(Flux.params(model_gpu)) do
+      l = loss(d...)
+    end
+    update!(opt, Flux.params(model_gpu), gs)
+  end
+  #@show accuracy(valX, valY)
+end
+
+
+using FluxTraining
+
+lossfn = Flux.Losses.logitbinarycrossentropy
+optimizer = Flux.ADAM();
+learner = Learner(model, lossfn; callbacks=[ToGPU(), Metrics(accuracy)], optimizer)
+
+FluxTraining.fit!(learner, 10, (trainloader, testloader))
